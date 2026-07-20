@@ -10,6 +10,8 @@ CREATE TABLE refresh_token (
 
                                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
+                               updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
                                user_id BIGINT NOT NULL,
 
                                CONSTRAINT fk_refresh_token_user
