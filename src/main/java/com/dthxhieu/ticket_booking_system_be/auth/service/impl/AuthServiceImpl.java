@@ -16,6 +16,7 @@ import com.dthxhieu.ticket_booking_system_be.repository.auth.RoleRepository;
 import com.dthxhieu.ticket_booking_system_be.repository.auth.UserRepository;
 import com.dthxhieu.ticket_booking_system_be.repository.auth.UserRoleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +29,7 @@ public class AuthServiceImpl implements AuthService {
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
     private final AuthMapper authMapper;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public RegisterResponse register(RegisterRequest request) {
@@ -48,7 +50,7 @@ public class AuthServiceImpl implements AuthService {
                 .email(request.getEmail())
 
                 // TODO: Thay bằng passwordEncoder.encode(...)
-                .password(request.getPassword())
+                .password(passwordEncoder.encode(request.getPassword()))
 
                 .phone(request.getPhone())
                 .status(UserStatus.ACTIVE)
