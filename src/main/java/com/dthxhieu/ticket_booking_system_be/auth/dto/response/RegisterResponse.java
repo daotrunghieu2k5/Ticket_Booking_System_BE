@@ -1,6 +1,6 @@
 package com.dthxhieu.ticket_booking_system_be.auth.dto.response;
 
-import com.dthxhieu.ticket_booking_system_be.conmon.enums.UserStatus;
+import com.dthxhieu.ticket_booking_system_be.common.enums.UserStatus;
 import lombok.*;
 
 @Getter

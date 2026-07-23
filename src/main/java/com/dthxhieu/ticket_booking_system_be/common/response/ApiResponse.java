@@ -1,4 +1,4 @@
-package com.dthxhieu.ticket_booking_system_be.conmon.response;
+package com.dthxhieu.ticket_booking_system_be.common.response;
 
 import lombok.Builder;
 import lombok.Getter;

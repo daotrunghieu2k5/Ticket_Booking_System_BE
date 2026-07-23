@@ -1,4 +1,4 @@
-package com.dthxhieu.ticket_booking_system_be.conmon.constant;
+package com.dthxhieu.ticket_booking_system_be.common.constant;
 
 
 public final class RoleConstant {

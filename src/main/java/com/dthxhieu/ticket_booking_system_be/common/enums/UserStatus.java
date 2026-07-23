@@ -1,4 +1,4 @@
-package com.dthxhieu.ticket_booking_system_be.conmon.enums;
+package com.dthxhieu.ticket_booking_system_be.common.enums;
 
 public enum UserStatus {
     ACTIVE,

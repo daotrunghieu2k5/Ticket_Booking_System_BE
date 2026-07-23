@@ -1,6 +1,6 @@
-package com.dthxhieu.ticket_booking_system_be.conmon.exception;
+package com.dthxhieu.ticket_booking_system_be.common.exception;
 
-import com.dthxhieu.ticket_booking_system_be.conmon.response.ApiResponse;
+import com.dthxhieu.ticket_booking_system_be.common.response.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
