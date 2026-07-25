@@ -1,6 +1,6 @@
 package com.dthxhieu.ticket_booking_system_be.entity.auth;
 
-import com.dthxhieu.ticket_booking_system_be.conmon.enums.UserStatus;
+import com.dthxhieu.ticket_booking_system_be.common.enums.UserStatus;
 import com.dthxhieu.ticket_booking_system_be.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
