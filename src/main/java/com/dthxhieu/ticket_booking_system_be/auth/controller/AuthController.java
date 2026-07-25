@@ -1,9 +1,11 @@
 package com.dthxhieu.ticket_booking_system_be.auth.controller;
 
 import com.dthxhieu.ticket_booking_system_be.auth.dto.request.LoginRequest;
+import com.dthxhieu.ticket_booking_system_be.auth.dto.request.RefreshTokenRequest;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.request.RegisterRequest;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.request.VerifyOtpRequest;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.response.LoginResponse;
+import com.dthxhieu.ticket_booking_system_be.auth.dto.response.RefreshTokenResponse;
 import com.dthxhieu.ticket_booking_system_be.auth.service.AuthService;
 import com.dthxhieu.ticket_booking_system_be.common.response.ApiResponse;
 import jakarta.validation.Valid;
@@ -56,6 +58,19 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.<LoginResponse>builder()
                 .success(true)
                 .message("Login successfully.")
+                .data(response)
+                .build());
+    }
+
+    @PostMapping("/refresh-token")
+    public ResponseEntity<ApiResponse<RefreshTokenResponse>> refreshToken(
+            @Valid @RequestBody RefreshTokenRequest request
+    ) {
+        RefreshTokenResponse response = authService.refreshToken(request);
+
+        return ResponseEntity.ok(ApiResponse.<RefreshTokenResponse>builder()
+                .success(true)
+                .message("Token refreshed successfully.")
                 .data(response)
                 .build());
     }

@@ -1,42 +1,52 @@
 # PROJECT_CONTEXT.md
-
 # Ticket Booking System
 
-## 1. Project Overview
+## 1. Project Purpose
 
-### Project Name
+Ticket Booking System is a web-based ticket reservation platform that allows users to:
 
-Ticket Booking System
+- browse events
+- view event details
+- select event sessions
+- choose seats
+- book tickets
+- make online payments
+- manage bookings
 
-### Goal
+The project is built as a portfolio project for a Java Backend Internship.
 
-Develop a modern web-based Ticket Booking System that allows users to:
+Primary goals:
 
-- Browse available events
-- View event details
-- Select event sessions
-- Choose seats
-- Book tickets
-- Make online payments
-- Manage bookings
-
-The project is developed as a portfolio project for a Java Backend Internship.
-
-The focus is on:
-
-- Clean architecture
-- Maintainable code
-- RESTful API
-- Realistic business flow
-- Secure authentication
-- Good database design
+- clean architecture
+- maintainable code
+- realistic business flow
+- secure authentication
+- stable database design
+- easy-to-read code that can be explained in interviews
 
 ---
 
-# 2. Tech Stack
+## 2. Source of Truth
 
-## Backend
+The following documents are the source of truth for the project:
 
+- `docs/PROJECT_CONTEXT.md`
+- `docs/DATABASE.md`
+- `docs/TODO.md`
+- `docs/specs/USxx_*.md`
+
+Rules:
+
+- If a detail exists in `DATABASE.md`, follow it.
+- If a detail exists in a user story spec, follow it.
+- If something is unclear or missing, ask before generating code.
+- Do not invent features, fields, or packages that are not documented.
+
+---
+
+## 3. Tech Stack
+
+### Backend
 - Java 21
 - Spring Boot 4.1
 - Spring Security
@@ -47,577 +57,474 @@ The focus is on:
 - Lombok
 - Jakarta Validation
 
-## Authentication
-
-- JWT
+### Authentication
+- JWT Access Token
 - Refresh Token
 - Email OTP Verification
 
-## Frontend
-
+### Frontend
 - React
 - Vite
 - TailwindCSS
 
+Frontend is planned, but the current focus is backend development.
+
 ---
 
-# 3. Project Architecture
+## 4. Current Project Status
 
-Package structure
+### Completed
+- Database design
+- ERD
+- Data Dictionary
+- Flyway setup
+- BaseEntity
+- Authentication entities
+- Authentication repositories
+- Common infrastructure
+- Register with email verification
+- Verify OTP
+- Login
 
-src/main/java/com/dthxhieu.ticketbooking
+### In Progress
+- Refresh Token
 
-```
-auth
-booking
-event
-payment
-venue
+### Next
+- Logout
+- Forgot Password
+- Event module
+- Booking module
+- Payment module
+- Admin module
 
-repository
+---
+
+## 5. Architecture
+
+### Package Structure
+
+Use this structure as the default project layout:
+
+```text
+src/main/java/com/dthxhieu/ticketbooking
 ├── auth
+│   ├── controller
+│   ├── dto
+│   │   ├── request
+│   │   └── response
+│   ├── mapper
+│   ├── service
+│   │   ├── AuthService
+│   │   ├── OtpService
+│   │   └── impl
+│   └── validator
+│
 ├── booking
+│   ├── controller
+│   ├── dto
+│   ├── mapper
+│   └── service
+│
 ├── event
+│   ├── controller
+│   ├── dto
+│   ├── mapper
+│   └── service
+│
 ├── payment
-└── venue
-
-common
-├── constant
-├── exception
-├── mail
-├── response
-├── util
-├── validation
-└── mapper
-
-config
-
-security
+│   ├── controller
+│   ├── dto
+│   ├── mapper
+│   └── service
+│
+├── venue
+│   ├── controller
+│   ├── dto
+│   ├── mapper
+│   └── service
+│
+├── repository
+│   ├── auth
+│   ├── booking
+│   ├── event
+│   ├── payment
+│   └── venue
+│
+├── entity
+│   ├── auth
+│   ├── booking
+│   ├── event
+│   ├── payment
+│   └── venue
+│
+├── common
+│   ├── constant
+│   ├── exception
+│   ├── mail
+│   ├── response
+│   ├── util
+│   └── validation
+│
+├── config
+├── security
+└── TicketBookingApplication.java
 ```
 
-Rules
-
+### Architecture Rules
 - Organize code by business module.
-- Repository is separated from business modules.
-- Shared components must be placed inside common package.
+- Keep repository layer separated from controllers and services.
+- Place shared code inside `common`.
 - Do not create unnecessary packages.
+- Do not introduce new architecture styles without discussion.
 
 ---
 
-# 4. Coding Convention
+## 6. Coding Conventions
 
-## General
-
+### General
 - Keep code simple.
 - Readability is more important than clever code.
 - Avoid over-engineering.
-- Every class should have a single responsibility.
+- Each class should have a single responsibility.
+
+### Dependency Injection
+- Always use constructor injection.
+- Never use field injection.
+- Never rely on `@Autowired` for normal application code.
+- Prefer `@RequiredArgsConstructor`.
+
+### Entities
+- Use singular class names.
+- Entities should usually extend `BaseEntity`.
+- Use `BIGSERIAL` for primary keys.
+- Use `LocalDateTime` for timestamps.
+- Use `FetchType.LAZY` by default.
+- Avoid `CascadeType.ALL` unless it is clearly needed.
+
+### DTOs
+- Use request/response DTOs for API boundaries.
+- Do not expose entities directly in controllers.
+- Keep DTOs small and explicit.
+
+### Services
+- Service interfaces define behavior.
+- Service implementations contain the logic.
+- Put business rules in services, not controllers.
+- Keep methods small and focused.
+
+### Controllers
+- Controllers should be thin.
+- Controllers only handle request/response orchestration.
+- Controllers must not contain business logic.
+
+### Repositories
+- Repositories only handle data access.
+- Do not put business logic in repositories.
+- Prefer derived query methods when possible.
+- Use `@Query` only when needed.
 
 ---
 
-## Dependency Injection
+## 7. Database Conventions
 
-Always use constructor injection.
+### Database Engine
+- PostgreSQL
 
-Never use:
+### Migration Tool
+- Flyway
 
-```
-@Autowired
-```
+### Mandatory Rules
+- Never use `spring.jpa.hibernate.ddl-auto=create`.
+- Never use `ddl-auto=update` as the primary schema management strategy.
+- Every schema change must be made through Flyway migration.
+- Never modify an executed migration.
+- If schema changes are required, create a new migration.
 
-Use
+### Naming
+- Table names use singular nouns, except `users` if needed to avoid PostgreSQL reserved-word issues.
+- Column names use `snake_case`.
+- Foreign keys use `xxx_id`.
+- Audit columns use `created_at` and `updated_at`.
 
-```
-@RequiredArgsConstructor
-```
-
----
-
-## Naming Convention
-
-### Entity
-
-Use singular nouns.
-
-Example
-
-```
-User
-Role
-Booking
-Payment
-```
-
-### Repository
-
-```
-UserRepository
-BookingRepository
-PaymentRepository
-```
-
-### Service
-
-```
-AuthService
-BookingService
-```
-
-### Service Implementation
-
-```
-AuthServiceImpl
-BookingServiceImpl
-```
-
-### Controller
-
-```
-AuthController
-BookingController
-```
-
-### DTO
-
-```
-RegisterRequest
-LoginRequest
-
-RegisterResponse
-LoginResponse
-```
+### Special Table Rules
+- Join tables may omit `BaseEntity` if they do not need audit fields.
+- Temporary workflow tables may exist without foreign keys if the business flow requires it.
+- Keep database design aligned with `DATABASE.md`.
 
 ---
 
-## Entity Rules
+## 8. API Conventions
 
-Every entity should:
+### Base URL
+- `/api/v1`
 
-- extend BaseEntity (except join tables if unnecessary)
-- use BIGSERIAL as primary key
-- use LocalDateTime for timestamps
-- use FetchType.LAZY by default
-- avoid CascadeType.ALL unless required
+### Standard Response
+Every API must return `ApiResponse<T>`.
 
----
+### HTTP Status Codes
+Use standard HTTP semantics:
 
-# 5. Database Convention
+- `200 OK`
+- `201 CREATED`
+- `204 NO CONTENT`
+- `400 BAD REQUEST`
+- `401 UNAUTHORIZED`
+- `403 FORBIDDEN`
+- `404 NOT FOUND`
+- `409 CONFLICT`
+- `500 INTERNAL SERVER ERROR`
 
-Database
+### Validation
+- Use Jakarta Validation annotations.
+- Do not manually validate request fields inside controllers.
+- Keep validation messages clear and user-friendly.
 
-PostgreSQL
-
-Migration
-
-Flyway
-
-Never use
-
-```
-spring.jpa.hibernate.ddl-auto=create
-```
-
-Every schema change must be implemented using Flyway migration.
-
-Never modify an executed migration.
-
-Always create a new migration.
-
-Primary Key
-
-```
-BIGSERIAL
-```
-
-Foreign Key
-
-```
-xxx_id
-```
-
-Audit Columns
-
-```
-created_at
-
-updated_at
-```
-
-Table naming
-
-Use singular nouns.
-
-Example
-
-```
-user
-
-booking
-
-payment
-
-event_session
-```
+### Error Handling
+- Use `BusinessException` for business rule violations.
+- Use `GlobalExceptionHandler` for centralized exception mapping.
+- Do not expose raw internal exception messages to the client.
 
 ---
 
-# 6. API Convention
+## 9. Authentication Flow
 
-Base URL
+### Registration with Email OTP
+1. Client submits register request.
+2. Validate request.
+3. Check duplicated email in `users`.
+4. Generate OTP.
+5. Hash password with BCrypt.
+6. Save or update `email_verification`.
+7. Send OTP email.
+8. Wait for OTP verification.
 
-```
-/api/v1
-```
+### OTP Verification
+1. Client submits OTP.
+2. Validate request.
+3. Check `email_verification`.
+4. Check OTP expiration.
+5. Check attempt count.
+6. Compare OTP.
+7. Create `User`.
+8. Assign `CUSTOMER` role.
+9. Delete `email_verification`.
+10. Return success response.
 
-Response
+### Login
+1. Client submits email and password.
+2. Validate email and password.
+3. Verify password with BCrypt.
+4. Generate access token.
+5. Generate refresh token.
+6. Return tokens.
 
-Every API must return
-
-```
-ApiResponse<T>
-```
-
-HTTP Status
-
-```
-200 OK
-
-201 CREATED
-
-204 NO CONTENT
-
-400 BAD REQUEST
-
-401 UNAUTHORIZED
-
-403 FORBIDDEN
-
-404 NOT FOUND
-
-409 CONFLICT
-
-500 INTERNAL SERVER ERROR
-```
-
-Validation
-
-Use Jakarta Validation.
-
-Never manually validate request fields inside controller.
+### Refresh Token
+1. Client submits refresh token.
+2. Validate token.
+3. Load refresh token from database.
+4. Check revoked / expired state.
+5. Load user.
+6. Generate new access token.
+7. Return new token response.
 
 ---
 
-# 7. Authentication Flow
+## 10. Business Rules
 
-Registration
-
-```
-Client
-
-↓
-
-Submit Register Request
-
-↓
-
-Validate Request
-
-↓
-
-Check duplicated email
-
-↓
-
-Generate OTP
-
-↓
-
-Hash Password
-
-↓
-
-Save EmailVerification
-
-↓
-
-Send Email
-
-↓
-
-Wait for verification
-```
-
-OTP Verification
-
-```
-Client
-
-↓
-
-Submit OTP
-
-↓
-
-Validate OTP
-
-↓
-
-Create User
-
-↓
-
-Assign CUSTOMER role
-
-↓
-
-Delete EmailVerification
-
-↓
-
-Success
-```
-
-Login
-
-```
-Client
-
-↓
-
-Validate Email
-
-↓
-
-Validate Password
-
-↓
-
-Generate Access Token
-
-↓
-
-Generate Refresh Token
-
-↓
-
-Return Tokens
-```
-
----
-
-# 8. Business Rules
-
-Authentication
-
+### Authentication
 - One email can only have one pending OTP.
 - OTP expires after 5 minutes.
+- Maximum OTP attempts = 5.
 - Password must be encrypted before storing.
 - User is created only after OTP verification succeeds.
+- After successful OTP verification, `emailVerified` should be true for the created user.
+- After OTP verification succeeds, `email_verification` must be deleted.
 
-Booking
+### Role
+- Default role after registration is `CUSTOMER`.
 
-- One User can create many Bookings.
-- One Booking contains many BookingItems.
-- One Booking belongs to one EventSession.
+### Booking
+- One user can create many bookings.
+- One booking contains many booking items.
+- One booking belongs to one event session.
 
-Event
+### Event
+- One event can have many event sessions.
+- One venue can have many event sessions.
 
-- One Event has many EventSessions.
-- One Venue has many EventSessions.
-
-Payment
-
-- One Booking has one Payment.
-- One Payment has many PaymentTransactions.
-
-Role
-
-Default role after registration
-
-```
-CUSTOMER
-```
+### Payment
+- One booking has one payment.
+- One payment can have many payment transactions.
 
 ---
 
-# 9. Security Rules
+## 11. Security Rules
 
-Password
+### Password
+- Store password using BCrypt only.
+- Never store plain text password.
 
-BCrypt
+### JWT
+- Access token expiry: 15 minutes.
+- Refresh token expiry: 7 days.
 
-JWT Access Token
+### OTP
+- OTP is 6 digits.
+- OTP expires after 5 minutes.
+- OTP should not be reusable after success.
+- Maximum 5 verification attempts.
 
-15 minutes
-
-Refresh Token
-
-7 days
-
-OTP
-
-- 6 digits
-- expire after 5 minutes
-- maximum 5 verification attempts
-
-Never store plain text password.
-
-Never expose internal exception message.
+### General
+- Never expose sensitive internal details in API responses.
+- Never log secrets.
+- Keep authentication endpoints public only where required.
+- Protect all other endpoints with Spring Security.
 
 ---
 
-# 10. Error Handling
+## 12. Error Handling Rules
 
-Use
+Use `BusinessException` for:
 
-```
-BusinessException
-```
+- email already exists
+- user not found
+- OTP invalid
+- OTP expired
+- OTP exceeded attempts
+- refresh token invalid
+- refresh token expired
+- access denied business cases
 
-Never throw
+Use `GlobalExceptionHandler` for:
 
-```
-RuntimeException
-```
+- validation errors
+- business errors
+- unexpected server errors
 
-directly inside business logic.
-
-Handle exceptions globally using
-
-```
-@RestControllerAdvice
-```
-
----
-
-# 11. Git Workflow
-
-Branch
-
-```
-main
-
-develop
-
-feature/*
-```
-
-Commit format
-
-```
-feat(auth):
-
-feat(event):
-
-feat(payment):
-
-fix:
-
-refactor:
-
-docs:
-
-test:
-```
-
-Every completed feature should have one meaningful commit.
+Do not throw `RuntimeException` directly inside business logic.
 
 ---
 
-# 12. Development Workflow
+## 13. Git Workflow
 
-Every feature must follow:
+### Branches
+- `main`
+- `develop`
+- `feature/*`
+- `fix/*`
 
-```
-Requirement
+### Commit Format
+Use meaningful conventional commits:
 
-↓
+- `feat(auth): ...`
+- `feat(event): ...`
+- `feat(payment): ...`
+- `fix: ...`
+- `refactor: ...`
+- `docs: ...`
+- `test: ...`
 
-Database
-
-↓
-
-Entity
-
-↓
-
-Repository
-
-↓
-
-DTO
-
-↓
-
-Mapper
-
-↓
-
-Service
-
-↓
-
-Controller
-
-↓
-
-Validation
-
-↓
-
-Testing
-
-↓
-
-Git Commit
-```
-
-Do not skip steps.
+### Rules
+- Each completed feature should have one meaningful commit.
+- Do not make huge commits containing unrelated changes.
+- Keep commit messages specific.
 
 ---
 
-# 13. Current Project Status
+## 14. Development Workflow
 
-Completed
+Every feature should follow this sequence:
 
-- Database Design
-- ERD
-- Data Dictionary
-- Flyway
-- BaseEntity
-- Authentication Entities
-- Repository Layer
-- Password Encoder
+1. Requirement
+2. Database
+3. Entity
+4. Repository
+5. DTO
+6. Mapper
+7. Service
+8. Controller
+9. Validation
+10. Testing
+11. Git commit
 
-In Progress
-
-- Register with Email OTP
-
-Next
-
-- Verify OTP
-- Login
-- Refresh Token
-- Logout
-- Forgot Password
+Do not skip steps unless the task explicitly says to.
 
 ---
 
-# 14. AI Coding Instructions
+## 15. AI Coding Instructions
 
-Always read this file before generating code.
+When generating code:
 
-When implementing a feature:
+- Read `PROJECT_CONTEXT.md` first.
+- Read `DATABASE.md` first.
+- Read the current user story spec first.
+- Follow existing architecture and naming conventions.
+- Do not change package structure without permission.
+- Do not modify completed Flyway migrations.
+- Do not introduce new frameworks without discussion.
+- Do not create unnecessary abstraction.
+- Prefer simple, readable, production-ready code.
+- Keep features independently testable.
+- Respect all existing business rules.
+- If any requirement is unclear, ask for clarification before generating code.
 
-- Follow the existing package structure.
-- Do not change naming conventions.
-- Do not introduce new frameworks.
-- Do not modify completed migrations.
-- Do not generate unnecessary abstraction.
-- Prefer clean and readable code.
-- Generate production-ready code.
-- Explain important design decisions.
-- Respect existing business rules.
-- Keep each feature independently testable.
+### Required Output From AI
+After generating code, always provide:
 
-If information is missing, ask before generating code instead of making assumptions.
+1. Files created or modified
+2. Complete source code
+3. Architecture Decisions
+4. Knowledge Check
+5. Self-review / possible improvements
+
+### Architecture Decisions Format
+For each important decision, explain:
+
+- Decision
+- Why
+- Alternative
+- Trade-off
+- Future Improvement
+
+### Knowledge Check Format
+Explain the implementation as if mentoring a Java Backend Intern:
+
+1. Which Spring features are used?
+2. Which design patterns are used?
+3. Why is this implementation better than the simpler approach?
+4. What interview questions could be asked?
+5. What common mistakes do developers make?
+6. Which parts of the code are most important to understand?
+
+---
+
+## 16. Important Exclusions
+
+Do not add the following unless explicitly required by a user story:
+
+- Redis
+- Kafka
+- Microservices
+- CQRS
+- Event Sourcing
+- Reactive stack
+- Notifications
+- Permissions table
+- Ticket entity
+- Extra API wrappers beyond `ApiResponse<T>`
+
+If a feature is not in `DATABASE.md`, `TODO.md`, or a user story spec, do not invent it.
+
+---
+
+## 17. Current Working Principle
+
+The current development style is:
+
+- vibe coding with understanding
+- one user story at a time
+- AI generates code from specs
+- human reviews and understands code
+- commit only after the feature works
+
+This project should remain simple, explainable, and consistent.

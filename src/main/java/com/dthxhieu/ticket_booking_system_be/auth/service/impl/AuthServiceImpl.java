@@ -1,9 +1,11 @@
 package com.dthxhieu.ticket_booking_system_be.auth.service.impl;
 
 import com.dthxhieu.ticket_booking_system_be.auth.dto.request.LoginRequest;
+import com.dthxhieu.ticket_booking_system_be.auth.dto.request.RefreshTokenRequest;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.request.RegisterRequest;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.request.VerifyOtpRequest;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.response.LoginResponse;
+import com.dthxhieu.ticket_booking_system_be.auth.dto.response.RefreshTokenResponse;
 import com.dthxhieu.ticket_booking_system_be.auth.service.AuthService;
 import com.dthxhieu.ticket_booking_system_be.auth.service.OtpService;
 import com.dthxhieu.ticket_booking_system_be.common.constant.RoleConstant;
@@ -231,6 +233,56 @@ public class AuthServiceImpl implements AuthService {
         return LoginResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(rawRefreshToken)
+                .tokenType("Bearer")
+                .expiresIn(jwtService.getAccessTokenExpirationSeconds())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RefreshTokenResponse refreshToken(RefreshTokenRequest request) {
+
+        // 1. Find RefreshToken by the opaque token string.
+        //    BR-01: The token must exist in the database.
+        //    Using a generic error message to avoid exposing token internals.
+        RefreshToken refreshToken = refreshTokenRepository
+                .findByToken(request.getRefreshToken())
+                .orElseThrow(() -> new BusinessException("Invalid refresh token."));
+
+        // 2. Reject revoked tokens.
+        //    BR-02: A revoked token must never produce a new access token.
+        //    Revocation is used in logout (future US) to invalidate a session immediately.
+        if (refreshToken.getRevoked()) {
+            throw new BusinessException("Refresh token has been revoked.");
+        }
+
+        // 3. Reject expired tokens.
+        //    BR-03: An expired token means the session has lapsed; the user must log in again.
+        //    We check expiry AFTER revocation so a revoked+expired token gives the revoked message.
+        if (LocalDateTime.now().isAfter(refreshToken.getExpiredAt())) {
+            throw new BusinessException("Refresh token has expired. Please log in again.");
+        }
+
+        // 4. Load the associated user from the stored relationship.
+        //    The RefreshToken entity holds a @ManyToOne to User - no extra DB query needed.
+        //    BR-05: User must still exist and be active.
+        User user = refreshToken.getUser();
+
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new BusinessException("Account is inactive.");
+        }
+
+        // 5. Generate a new access token.
+        //    BR-04: Every refresh request produces a fresh access token.
+        //    The @Transactional(readOnly = true) boundary keeps the Hibernate session open
+        //    so the LAZY userRoles collection can be accessed by JwtService.
+        String newAccessToken = jwtService.generateAccessToken(user);
+
+        // 6. Return the new access token.
+        //    BR-06: No refresh token rotation in this user story.
+        //    BR-07: Only the access token is returned - no sensitive internals exposed.
+        return RefreshTokenResponse.builder()
+                .accessToken(newAccessToken)
                 .tokenType("Bearer")
                 .expiresIn(jwtService.getAccessTokenExpirationSeconds())
                 .build();
