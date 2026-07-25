@@ -1,10 +1,20 @@
 package com.dthxhieu.ticket_booking_system_be.auth.service;
 
+import com.dthxhieu.ticket_booking_system_be.auth.dto.request.LoginRequest;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.request.RegisterRequest;
-import com.dthxhieu.ticket_booking_system_be.auth.dto.response.RegisterResponse;
+import com.dthxhieu.ticket_booking_system_be.auth.dto.request.VerifyOtpRequest;
+import com.dthxhieu.ticket_booking_system_be.auth.dto.response.LoginResponse;
 
 public interface AuthService {
 
-    RegisterResponse register(RegisterRequest request);
+    // Register creates an EmailVerification record and sends an OTP email.
+    // A real User is NOT created here - only after OTP verification succeeds.
+    void register(RegisterRequest request);
 
-}
+    // Verifies the OTP, then creates the User and assigns the CUSTOMER role.
+    void verifyOtp(VerifyOtpRequest request);
+
+    // Authenticates the user, generates JWT + Refresh Token, stores the Refresh Token.
+    LoginResponse login(LoginRequest request);
+
+}

@@ -19,3 +19,16 @@ spring:
     secret: your-very-long-secret-key-at-least-256-bits
     access-token-expiration: 900000
     refresh-token-expiration: 604800000
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: daotrunghieup@gmail.com
+    password: dpsa uubx fjxj lfgd
+
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true

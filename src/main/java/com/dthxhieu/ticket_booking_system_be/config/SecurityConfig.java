@@ -2,9 +2,13 @@ package com.dthxhieu.ticket_booking_system_be.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 @EnableWebSecurity
@@ -15,4 +19,23 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                // Disable CSRF — this is a stateless JWT API, no session cookies.
+                .csrf(AbstractHttpConfigurer::disable)
+
+                // Use stateless session — Spring Security must not create HttpSession.
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                .authorizeHttpRequests(auth -> auth
+                        // Public auth endpoints: register, verify-otp, login, refresh
+                        .requestMatchers("/api/v1/auth/**").permitAll()
+                        // Everything else requires authentication
+                        .anyRequest().authenticated()
+                );
+
+        return http.build();
+    }
 }

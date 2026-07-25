@@ -25,7 +25,7 @@ public class RegisterRequest {
     @NotBlank(message = "Password is required")
     @Pattern(
             regexp = "^(?=.*[A-Za-z])(?=.*\\d).{8,100}$",
-            message = "Password must contain at least one letter and one number"
+            message = "Password must be at least 8 characters long and include both letters and numbers"
     )
     private String password;
 
