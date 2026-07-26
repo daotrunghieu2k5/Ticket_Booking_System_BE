@@ -74,4 +74,18 @@ public class AuthController {
                 .data(response)
                 .build());
     }
+
+    // Logout reuses RefreshTokenRequest - the payload is identical (a single refresh token string).
+    // No separate LogoutRequest DTO is needed; spec section 9 confirms ApiResponse<Void> is acceptable.
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @Valid @RequestBody RefreshTokenRequest request
+    ) {
+        authService.logout(request);
+
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .success(true)
+                .message("Logout successfully.")
+                .build());
+    }
 }

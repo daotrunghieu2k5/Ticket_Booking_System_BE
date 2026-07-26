@@ -23,4 +23,8 @@ public interface AuthService {
     // Does NOT create a new Refresh Token (no rotation in this user story).
     RefreshTokenResponse refreshToken(RefreshTokenRequest request);
 
-}
+    // Revokes the provided Refresh Token to end the current session.
+    // Only the supplied token is affected; other active sessions remain valid.
+    void logout(RefreshTokenRequest request);
+
+}

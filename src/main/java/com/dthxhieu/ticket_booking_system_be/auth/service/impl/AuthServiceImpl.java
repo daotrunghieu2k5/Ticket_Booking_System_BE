@@ -287,4 +287,40 @@ public class AuthServiceImpl implements AuthService {
                 .expiresIn(jwtService.getAccessTokenExpirationSeconds())
                 .build();
     }
+
+    @Override
+    public void logout(RefreshTokenRequest request) {
+
+        // 1. Find RefreshToken by the opaque token string.
+        //    FR-04: Missing or unrecognised tokens are rejected immediately.
+        //    Using a generic message to avoid leaking token structure details (BR-07).
+        RefreshToken refreshToken = refreshTokenRepository
+                .findByToken(request.getRefreshToken())
+                .orElseThrow(() -> new BusinessException("Invalid refresh token."));
+
+        // 2. Reject tokens that are already revoked.
+        //    BR-08: Logout on a revoked token is an error, not a silent no-op.
+        //    This prevents confused client state where the user thinks they logged out
+        //    but the token was never valid to begin with.
+        if (refreshToken.getRevoked()) {
+            throw new BusinessException("Refresh token has already been revoked.");
+        }
+
+        // 3. Reject expired tokens.
+        //    FR-06: An expired token no longer represents an active session.
+        //    Treating it as a successful logout would be misleading.
+        //    We check expiry AFTER revocation so a revoked+expired token gives the revoked message.
+        if (LocalDateTime.now().isAfter(refreshToken.getExpiredAt())) {
+            throw new BusinessException("Refresh token has expired.");
+        }
+
+        // 4. Mark the token as revoked and persist.
+        //    BR-01: Only the provided token is affected - other sessions are unchanged.
+        //    BR-04: No new token is created.
+        //    BR-05: The User entity itself is not modified.
+        //    The @Transactional boundary ensures the update is committed atomically.
+        //    If the save fails, the transaction rolls back and the token remains active.
+        refreshToken.setRevoked(true);
+        refreshTokenRepository.save(refreshToken);
+    }
 }
