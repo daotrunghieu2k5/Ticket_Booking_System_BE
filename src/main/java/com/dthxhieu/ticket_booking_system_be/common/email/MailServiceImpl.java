@@ -20,4 +20,13 @@ public class MailServiceImpl implements MailService {
         mailSender.send(message);
     }
 
+    @Override
+    public void sendPasswordResetOtpEmail(String email, String otp) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(email);
+        message.setSubject(MailSubject.RESET_PASSWORD);
+        message.setText(MailTemplate.passwordResetOtp(otp));
+        mailSender.send(message);
+    }
+
 }

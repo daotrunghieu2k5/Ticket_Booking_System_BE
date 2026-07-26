@@ -1,7 +1,11 @@
 package com.dthxhieu.ticket_booking_system_be.auth.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Getter
 @Setter
@@ -10,6 +14,6 @@ import lombok.*;
 @Builder
 public class RefreshTokenRequest {
 
-    @NotBlank
+    @NotBlank(message = "Refresh token is required")
     private String refreshToken;
-}
+}
