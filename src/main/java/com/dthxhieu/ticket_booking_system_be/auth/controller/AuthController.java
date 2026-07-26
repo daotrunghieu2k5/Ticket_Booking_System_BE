@@ -1,8 +1,10 @@
 package com.dthxhieu.ticket_booking_system_be.auth.controller;
 
+import com.dthxhieu.ticket_booking_system_be.auth.dto.request.ForgotPasswordRequest;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.request.LoginRequest;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.request.RefreshTokenRequest;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.request.RegisterRequest;
+import com.dthxhieu.ticket_booking_system_be.auth.dto.request.ResetPasswordRequest;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.request.VerifyOtpRequest;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.response.LoginResponse;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.response.RefreshTokenResponse;
@@ -86,6 +88,32 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .success(true)
                 .message("Logout successfully.")
+                .build());
+    }
+
+    // BR-07: The response is always the same regardless of whether the email exists,
+    // so that attackers cannot enumerate registered users.
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request
+    ) {
+        authService.forgotPassword(request);
+
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .success(true)
+                .message("If the email exists, a verification code has been sent.")
+                .build());
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request
+    ) {
+        authService.resetPassword(request);
+
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .success(true)
+                .message("Password reset successfully.")
                 .build());
     }
 }

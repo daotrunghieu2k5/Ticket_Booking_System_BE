@@ -1,8 +1,10 @@
 package com.dthxhieu.ticket_booking_system_be.auth.service.impl;
 
+import com.dthxhieu.ticket_booking_system_be.auth.dto.request.ForgotPasswordRequest;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.request.LoginRequest;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.request.RefreshTokenRequest;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.request.RegisterRequest;
+import com.dthxhieu.ticket_booking_system_be.auth.dto.request.ResetPasswordRequest;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.request.VerifyOtpRequest;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.response.LoginResponse;
 import com.dthxhieu.ticket_booking_system_be.auth.dto.response.RefreshTokenResponse;
@@ -15,12 +17,14 @@ import com.dthxhieu.ticket_booking_system_be.common.exception.BusinessException;
 import com.dthxhieu.ticket_booking_system_be.common.exception.EmailAlreadyExistsException;
 import com.dthxhieu.ticket_booking_system_be.common.exception.ResourceNotFoundException;
 import com.dthxhieu.ticket_booking_system_be.entity.auth.EmailVerification;
+import com.dthxhieu.ticket_booking_system_be.entity.auth.PasswordReset;
 import com.dthxhieu.ticket_booking_system_be.entity.auth.RefreshToken;
 import com.dthxhieu.ticket_booking_system_be.entity.auth.Role;
 import com.dthxhieu.ticket_booking_system_be.entity.auth.User;
 import com.dthxhieu.ticket_booking_system_be.entity.auth.UserRole;
 import com.dthxhieu.ticket_booking_system_be.entity.auth.UserRoleId;
 import com.dthxhieu.ticket_booking_system_be.repository.auth.EmailVerificationRepository;
+import com.dthxhieu.ticket_booking_system_be.repository.auth.PasswordResetRepository;
 import com.dthxhieu.ticket_booking_system_be.repository.auth.RefreshTokenRepository;
 import com.dthxhieu.ticket_booking_system_be.repository.auth.RoleRepository;
 import com.dthxhieu.ticket_booking_system_be.repository.auth.UserRepository;
@@ -45,10 +49,12 @@ public class AuthServiceImpl implements AuthService {
     private final UserRoleRepository userRoleRepository;
     private final EmailVerificationRepository emailVerificationRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final PasswordResetRepository passwordResetRepository;
     private final OtpService otpService;
     private final MailService mailService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+
 
     // Refresh Token TTL is injected from application.yml (milliseconds).
     // Converted to days in the login method for LocalDateTime arithmetic.
@@ -322,5 +328,111 @@ public class AuthServiceImpl implements AuthService {
         //    If the save fails, the transaction rolls back and the token remains active.
         refreshToken.setRevoked(true);
         refreshTokenRepository.save(refreshToken);
+    }
+
+    @Override
+    public void forgotPassword(ForgotPasswordRequest request) {
+
+        // 1. Look up the user by email.
+        //    BR-07: Do NOT throw if the email is not found.
+        //    A generic success response is returned regardless, so that attackers
+        //    cannot determine which emails are registered (user enumeration protection).
+        if (!userRepository.existsByEmail(request.getEmail())) {
+            return;
+        }
+
+        // 2. Upsert PasswordReset record.
+        //    BR-02 / BR-12: One email can only have one pending reset at a time.
+        //    If a previous reset request exists, delete it and create a fresh one
+        //    so the old OTP is invalidated immediately.
+        if (passwordResetRepository.existsByEmail(request.getEmail())) {
+            passwordResetRepository.deleteByEmail(request.getEmail());
+            // Flush before INSERT to avoid a unique constraint violation on the email column.
+            passwordResetRepository.flush();
+        }
+
+        // 3. Generate OTP.
+        //    Reuses OtpService to keep OTP generation centralised.
+        String otp = otpService.generateOtp();
+
+        // 4. Save PasswordReset record.
+        //    BR-01: This is a temporary record; it is deleted after a successful reset.
+        PasswordReset passwordReset = PasswordReset.builder()
+                .email(request.getEmail())
+                .otpCode(otp)
+                .expiredAt(otpService.generateExpiredAt())
+                .attemptCount((short) 0)
+                .build();
+
+        passwordResetRepository.save(passwordReset);
+
+        // 5. Send the OTP email.
+        //    Placed after the DB save so no email is sent if the save fails.
+        mailService.sendPasswordResetOtpEmail(request.getEmail(), otp);
+    }
+
+    @Override
+    public void resetPassword(ResetPasswordRequest request) {
+
+        // 1. Load the PasswordReset record.
+        //    If no record exists the user has not initiated a forgot-password flow.
+        PasswordReset passwordReset = passwordResetRepository
+                .findByEmail(request.getEmail())
+                .orElseThrow(() -> new BusinessException("No password reset request found for this email."));
+
+        // 2. Check OTP expiry.
+        //    BR-03: OTP expires after 5 minutes.
+        //    The record is deleted on expiry so the user must restart the flow.
+        if (LocalDateTime.now().isAfter(passwordReset.getExpiredAt())) {
+            passwordResetRepository.delete(passwordReset);
+            throw new BusinessException("OTP has expired. Please request a new password reset.");
+        }
+
+        // 3. Check attempt limit BEFORE comparing OTP.
+        //    BR-04: Maximum 5 attempts.
+        //    Checking first prevents a 6th guess from bypassing the limit.
+        if (passwordReset.getAttemptCount() >= 5) {
+            passwordResetRepository.delete(passwordReset);
+            throw new BusinessException("Maximum OTP attempts exceeded. Please request a new password reset.");
+        }
+
+        // 4. Compare OTP.
+        //    On mismatch: increment attempt count and save - do NOT delete the record.
+        //    The user still has remaining attempts.
+        if (!passwordReset.getOtpCode().equals(request.getOtp())) {
+            passwordReset.setAttemptCount((short) (passwordReset.getAttemptCount() + 1));
+            passwordResetRepository.save(passwordReset);
+            throw new BusinessException("Invalid OTP.");
+        }
+
+        // 5. Load and validate the user.
+        //    The record holds only an email (no FK), so we resolve the user now.
+        //    BR-05 in logout spec applies here too: inactive users cannot reset passwords.
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new BusinessException("User not found."));
+
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            passwordResetRepository.delete(passwordReset);
+            throw new BusinessException("Account is inactive.");
+        }
+
+        // 6. Hash the new password and update the user.
+        //    BR-06: The new password must be BCrypt encoded before being stored.
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        // 7. Delete the PasswordReset record.
+        //    BR-08: The temporary record is removed after a successful reset.
+        passwordResetRepository.delete(passwordReset);
+
+        // 8. Revoke all existing Refresh Tokens for this user.
+        //    BR-09: All active sessions become invalid after a password change.
+        //    We set revoked = true on each token rather than deleting rows,
+        //    consistent with the revoke-over-delete policy used in logout (US-05).
+        refreshTokenRepository.findAllByUser(user)
+                .forEach(token -> {
+                    token.setRevoked(true);
+                    refreshTokenRepository.save(token);
+                });
     }
 }
