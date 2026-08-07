@@ -44,6 +44,9 @@ public class SecurityConfig {
                         // GET /api/v1/venues/{venueId}/seats (BR-12, US-09)
                         .requestMatchers(HttpMethod.GET, "/api/v1/seats/**").permitAll()
 
+                        // Public event reads — GET /api/v1/events and GET /api/v1/events/{id} (US-10)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/events/**").permitAll()
+
                         // Admin-only write operations on categories - BR-06
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
 
