@@ -13,6 +13,23 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    // ResourceNotFoundException extends BusinessException but signals a missing resource.
+    // A dedicated handler is needed to return 404 NOT FOUND instead of 400 BAD REQUEST.
+    // Spring selects the most specific exception handler, so this fires before
+    // the BusinessException handler below whenever a ResourceNotFoundException is thrown.
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleResourceNotFoundException(
+            ResourceNotFoundException ex
+    ) {
+        ApiResponse<Void> response =
+                ApiResponse.<Void>builder()
+                        .success(false)
+                        .message(ex.getMessage())
+                        .build();
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(
             BusinessException ex
