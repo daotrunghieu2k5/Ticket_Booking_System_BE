@@ -9,6 +9,6 @@ CREATE TABLE booking (
     status           VARCHAR(50)     NOT NULL,
     created_at       TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    user_id          BIGINT          NOT NULL REFERENCES "user"(id),
+    user_id          BIGINT          NOT NULL REFERENCES "users"(id),
     event_session_id BIGINT          NOT NULL REFERENCES event_session(id)
 );

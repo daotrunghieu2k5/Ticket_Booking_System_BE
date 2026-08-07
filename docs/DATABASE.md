@@ -32,7 +32,7 @@ Table
 Examples
 
 ```
-user
+users
 booking
 event_session
 payment_transaction
@@ -164,7 +164,7 @@ The Authentication module manages user accounts, authorization, registration, lo
 Tables
 
 ```
-user
+users
 role
 user_role
 refresh_token
@@ -174,7 +174,7 @@ password_reset
 
 ---
 
-# 4.1 user
+# 4.1 users
 
 ## Purpose
 
