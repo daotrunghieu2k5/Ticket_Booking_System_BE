@@ -6,1324 +6,777 @@
 
 # 1. Database Overview
 
-## Database Engine
+## Database
 
-- PostgreSQL
+PostgreSQL
 
-## ORM Framework
+## ORM
 
-- Spring Data JPA (Hibernate)
+Spring Data JPA / Hibernate
 
-## Migration Tool
+## Migration
 
-- Flyway
+Flyway
 
-## Primary Key Strategy
+## Primary Key
 
-- BIGSERIAL
+All normal entities use:
+
+BIGSERIAL
+
+Exception:
+
+`user_role` uses a composite primary key.
 
 ## Naming Convention
 
-Table
+Tables:
 
-- Singular noun
+- singular nouns
 - snake_case
 
-Examples
+Examples:
 
-```
+```text
 users
-booking
+role
+event
 event_session
-payment_transaction
-```
+booking
+booking_item
 
-Columns
+Columns:
 
-- snake_case
-
-Examples
-
-```
 full_name
 created_at
 event_session_id
-```
 
-Foreign Key
+Foreign keys:
 
-```
 xxx_id
-```
 
-Examples
+Examples:
 
-```
 user_id
+event_id
+venue_id
 booking_id
-payment_id
-```
-
 Audit Columns
 
-All business entities should contain
+Business entities normally contain:
 
-```
 created_at
 updated_at
-```
 
-unless the table is only used for temporary data.
+Temporary tables may use audit columns only when useful.
 
----
+2. Database Design Principles
+PostgreSQL is the source of truth.
+Flyway manages all schema changes.
+Never modify an executed Flyway migration.
+Every schema change requires a new migration.
+Foreign keys must enforce referential integrity.
+Enums are stored as VARCHAR.
+Monetary values use NUMERIC and map to BigDecimal.
+Timestamps map to LocalDateTime.
+Passwords are stored using BCrypt.
+Booking and payment history must not be physically deleted.
+Prefer logical status over physical deletion for historical business data.
+Do not introduce unnecessary tables.
+3. Database Architecture
+AUTHENTICATION
 
-# 2. Database Design Rules
-
-## General Rules
-
-- Every entity uses BIGSERIAL as primary key.
-- Every foreign key must enforce referential integrity.
-- Every business entity extends BaseEntity unless otherwise specified.
-- Use LocalDateTime for timestamp fields.
-- Store enums as VARCHAR.
-- Passwords must be stored using BCrypt.
-- Never store plain text passwords.
-- Never modify executed Flyway migrations.
-- Every schema change must create a new migration.
-
----
-
-## JPA Rules
-
-- Prefer FetchType.LAZY.
-- Avoid CascadeType.ALL.
-- Use orphanRemoval only when required.
-- Use constructor injection.
-- Every entity should have a no-args constructor with protected access.
-
----
-
-## Data Integrity Rules
-
-- Booking history must never be deleted.
-- Payment history must never be deleted.
-- Use logical status instead of physical deletion whenever possible.
-- Every unique business identifier must have a UNIQUE constraint.
-
----
-
-# 3. Database Schema
-
-```
-Authentication
-
-User
-├── UserRole
-│      └── Role
+Users
+├── UserRole ─── Role
 ├── RefreshToken
 ├── EmailVerification
 └── PasswordReset
 
-----------------------------------------------------
 
-Event
+EVENT
 
 Category
-      │
-      ▼
-Event
-      │
-      ▼
-EventSession
-      │
-      ├── Venue
-      │       │
-      │       └── Seat
-      │
-      ├── SeatHold
-      │
-      └── Booking
+    │
+    └── Event
+          │
+          └── EventSession
+                │
+                ├── Venue
+                │     │
+                │     └── Seat
+                │
+                ├── SeatHold
+                │
+                └── Booking
 
-----------------------------------------------------
 
-Booking
+BOOKING & PAYMENT
 
-Booking
-├── BookingItem
-├── Payment
-│      └── PaymentTransaction
-└── User
-```
+Users
+ │
+ └── Booking
+       ├── BookingItem ─── Seat
+       └── Payment
+              │
+              └── PaymentTransaction
+4. Authentication Module
 
----
+Tables:
 
-# 4. Authentication Module
-
-The Authentication module manages user accounts, authorization, registration, login, refresh tokens, email verification and password reset.
-
-Tables
-
-```
 users
 role
 user_role
 refresh_token
 email_verification
 password_reset
-```
+4.1 users
+Purpose
 
----
+Stores registered users.
 
-# 4.1 users
+A user is created only after successful email OTP verification.
 
-## Purpose
+Columns
+Column	Description
+id	Primary key
+full_name	User full name
+email	Login email
+password	BCrypt password
+phone	Phone number
+avatar	Avatar URL
+status	UserStatus
+email_verified	Email verification flag
+created_at	Creation time
+updated_at	Last update
+Constraints
+UNIQUE(email)
+Relationships
+User 1:N Booking
+User 1:N RefreshToken
+User 1:N SeatHold
+User N:M Role through UserRole
+Business Rules
+Email must be unique.
+Password must always be BCrypt encoded.
+User is created only after successful OTP verification.
+Default role is CUSTOMER.
+email_verified must be true for a successfully registered account.
+User status is represented by UserStatus.
+4.2 role
+Purpose
 
-Stores all registered users.
+Stores system roles.
 
-A User is created only after successful OTP verification.
-
----
-
-## Columns
-
-| Column | Description |
-|----------|-------------|
-| id | Primary key |
-| full_name | User full name |
-| email | Login email (Unique) |
-| password | BCrypt password |
-| phone | Phone number |
-| avatar | Avatar URL |
-| status | Account status |
-| email_verified | Email verification status |
-| created_at | Created timestamp |
-| updated_at | Updated timestamp |
-
----
-
-## Relationships
-
-User
-
-```
-1 ---- * Booking
-```
-
-User
-
-```
-1 ---- * RefreshToken
-```
-
-User
-
-```
-1 ---- * SeatHold
-```
-
-User
-
-```
-* ---- * Role
-```
-
-through UserRole.
-
----
-
-## Business Rules
-
-- Email must be unique.
-- Password is stored using BCrypt.
-- User is created only after OTP verification.
-- Default role is CUSTOMER.
-- Email verification cannot be bypassed.
-- Account status is managed by UserStatus enum.
-
----
-
-# 4.2 role
-
-## Purpose
-
-Stores all system roles.
-
----
-
-## Columns
-
-| Column | Description |
-|----------|-------------|
-| id | Primary key |
-| name | Role name (Unique) |
-
----
-
-## Default Data
-
-```
+Columns
+Column	Description
+id	Primary key
+name	RoleName
+Constraints
+UNIQUE(name)
+Default Roles
 ADMIN
 CUSTOMER
-```
+Relationships
+Role 1:N UserRole
+4.3 user_role
+Purpose
+
+Many-to-many mapping between User and Role.
+
+Columns
+Column	Description
+user_id	FK → user
+role_id	FK → role
+Primary Key
+
+Composite:
+
+(user_id, role_id)
+Rules
+No duplicate user-role assignment.
+This is a join table.
+It does not need a separate BIGSERIAL id.
+It does not need business audit fields unless required by the implementation.
+4.4 refresh_token
+Purpose
+
+Stores refresh tokens used to obtain new access tokens.
+
+Columns
+Column	Description
+id	Primary key
+token	Opaque refresh token
+revoked	Revocation flag
+created_at	Creation time
+expired_at	Expiration time
+user_id	FK → user
+Constraints
+UNIQUE(token)
+Rules
+One user may have multiple refresh tokens.
+Token expires after 7 days.
+Revoked tokens cannot be reused.
+Expired tokens cannot be reused.
+Refresh tokens must not be logged.
+4.5 email_verification
+Purpose
+
+Temporary data used during registration.
+
+Columns
+Column	Description
+id	Primary key
+full_name	Registration full name
+email	Registration email
+password	BCrypt password
+phone	Phone number
+otp_code	Six-digit OTP
+expired_at	OTP expiration
+verified	Verification status
+attempt_count	Number of attempts
+created_at	Creation time
+updated_at	Last update
+Constraints
+UNIQUE(email)
+Rules
+OTP contains exactly 6 digits.
+OTP expires after 5 minutes.
+Maximum 5 verification attempts.
+Password is already BCrypt encoded.
+Record is deleted after successful verification.
+Record may be deleted when expired or locked.
+This table does not reference User because User is created after verification.
+4.6 password_reset
+Purpose
+
+Temporary data used during Forgot Password.
+
+Columns
+Column	Description
+id	Primary key
+email	User email
+otp_code	Six-digit OTP
+expired_at	OTP expiration
+verified	Verification status
+attempt_count	Number of attempts
+created_at	Creation time
+updated_at	Last update
+Rules
+One active reset request per email.
+OTP contains exactly 6 digits.
+OTP expires after 5 minutes.
+Maximum 5 attempts.
+Record is deleted after successful password reset.
+Expired records may be deleted.
+This table is temporary and does not need a foreign key to User.
+5. Event Module
+
+Tables:
 
----
-
-## Relationships
-
-Role
-
-```
-1 ---- * UserRole
-```
-
----
-
-## Business Rules
-
-- Role name must be unique.
-- Roles are assigned through UserRole.
-- A user may have multiple roles.
-
----
-
-# 4.3 user_role
-
-## Purpose
-
-Many-to-many mapping table between User and Role.
-
----
-
-## Columns
-
-| Column | Description |
-|----------|-------------|
-| user_id | FK → user |
-| role_id | FK → role |
-
----
-
-## Relationships
-
-User
-
-```
-1 ---- * UserRole
-```
-
-Role
-
-```
-1 ---- * UserRole
-```
-
----
-
-## Business Rules
-
-- Composite primary key.
-- One user may own multiple roles.
-- One role may belong to multiple users.
-
----
-
-# 4.4 refresh_token
-
-## Purpose
-
-Stores Refresh Tokens used to obtain new JWT Access Tokens.
-
----
-
-## Columns
-
-| Column | Description |
-|----------|-------------|
-| id | Primary key |
-| token | Refresh token (Unique) |
-| revoked | Revoked flag |
-| created_at | Creation time |
-| expired_at | Expiration time |
-| user_id | FK → user |
-
----
-
-## Relationships
-
-User
-
-```
-1 ---- * RefreshToken
-```
-
----
-
-## Business Rules
-
-- One user may own multiple refresh tokens.
-- Token value must be unique.
-- Expired tokens cannot be reused.
-- Revoked tokens cannot be reused.
-- Refresh Token expires after 7 days.
-
----
-
-# 4.5 email_verification
-
-## Purpose
-
-Temporary table for user registration before account activation.
-
-The record exists only until OTP verification succeeds or expires.
-
----
-
-## Columns
-
-| Column | Description |
-|----------|-------------|
-| id | Primary key |
-| full_name | User full name |
-| email | Registration email (Unique) |
-| password | BCrypt password |
-| phone | Phone number |
-| otp_code | Six-digit OTP |
-| expired_at | OTP expiration time |
-| verified | Verification status |
-| attempt_count | Number of verification attempts |
-| created_at | Creation time |
-| updated_at | Updated time |
-
----
-
-## Relationships
-
-None
-
-This table is temporary and does not reference User.
-
----
-
-## Business Rules
-
-- Email must be unique.
-- OTP consists of six digits.
-- OTP expires after five minutes.
-- Maximum five verification attempts.
-- Delete record after successful verification.
-- Delete expired records.
-- Password is already BCrypt encoded before storing.
-
----
-
-# 4.6 password_reset
-
-## Purpose
-
-Stores temporary information used during the Forgot Password flow.
-
-The record is deleted after password reset succeeds or expires.
-
----
-
-## Columns
-
-| Column | Description |
-|----------|-------------|
-| id | Primary key |
-| email | User email |
-| otp_code | Password reset OTP |
-| expired_at | OTP expiration |
-| verified | OTP verification status |
-| attempt_count | Verification attempts |
-| created_at | Creation time |
-| updated_at | Updated time |
-
----
-
-## Relationships
-
-None
-
-Temporary table.
-
----
-
-## Business Rules
-
-- One active password reset request per email.
-- OTP expires after five minutes.
-- Maximum five verification attempts.
-- Delete record after successful password reset.
-- Delete expired records.
-
----
-
-# 5. Event Module
-
-The Event module manages event information, event categories, venues, seats, and event schedules.
-
-Tables
-
-```
 category
 venue
 seat
 event
 event_session
-```
-
----
-
-# 5.1 category
-
-## Purpose
+5.1 category
+Purpose
 
 Stores event categories.
 
-Categories are used to classify events.
+Columns
+Column	Description
+id	Primary key
+name	Category name
+description	Category description
+created_at	Creation time
+updated_at	Last update
+Constraints
+UNIQUE(name)
+
+Application-level comparison should ignore surrounding spaces and case.
+
+Relationships
+Category 1:N Event
+Rules
+Category name cannot be blank.
+Category name must be unique.
+Category cannot be deleted while referenced by Event.
+5.2 venue
+Purpose
+
+Stores physical event locations.
+
+Columns
+Column	Description
+id	Primary key
+name	Venue name
+address	Venue address
+capacity	Declared venue capacity
+created_at	Creation time
+updated_at	Last update
+Relationships
+Venue 1:N Seat
+Venue 1:N EventSession
+Rules
+A venue can contain many physical seats.
+A venue can host many sessions.
+Venue must not be deleted while referenced by EventSession.
+Capacity must be greater than zero.
+Active seat count must not exceed venue capacity.
+5.3 seat
+Purpose
+
+Stores permanent physical seats belonging to a Venue.
+
+IMPORTANT:
+
+A Seat belongs to a Venue, NOT to an EventSession.
+
+The same physical seat can be used by many EventSessions held at the same Venue.
+
+Columns
+Column	Description
+id	Primary key
+section	Seat section
+row_name	Row identifier
+seat_number	Seat number
+seat_type	Seat type
+price_multiplier	Price multiplier
+active	Whether the physical seat is active
+venue_id	FK → venue
+Constraints
+UNIQUE(venue_id, row_name, seat_number)
+Relationships
+Venue 1:N Seat
+Seat 1:N SeatHold
+Seat 1:N BookingItem
+Rules
+Seat permanently belongs to one Venue.
+Seat cannot belong to multiple Venues.
+Inactive seats cannot be booked.
+price_multiplier > 0.
+Seat identity is determined by:
+venue_id + row_name + seat_number
+
+IMPORTANT:
+
+Do NOT add:
+
+AVAILABLE
+RESERVED
+BOOKED
+
+as a permanent Seat status.
+
+Seat availability depends on the EventSession.
+
+5.4 event
+Purpose
+
+Stores the main event information.
+
+Columns
+Column	Description
+id	Primary key
+title	Event title
+description	Event description
+poster	Poster URL
+duration	Duration in minutes
+age_limit	Minimum age
+status	EventStatus
+category_id	FK → category
+created_at	Creation time
+updated_at	Last update
+Relationships
+Category 1:N Event
+Event 1:N EventSession
+Rules
+Every Event belongs to one Category.
+An Event can have multiple EventSessions.
+Duration is stored in minutes.
+Event uses EventStatus.
+Event cancellation must not delete Booking history.
+Prefer logical status instead of physical deletion.
+5.5 event_session
+Purpose
+
+Represents one scheduled showing of an Event.
+
+Columns
+Column	Description
+id	Primary key
+start_time	Session start time
+end_time	Session end time
+booking_open	Booking opening time
+booking_close	Booking closing time
+base_price	Base ticket price
+status	SessionStatus
+event_id	FK → event
+venue_id	FK → venue
+created_at	Creation time
+updated_at	Last update
+Constraints
+UNIQUE(event_id, venue_id, start_time)
+Relationships
+Event 1:N EventSession
+Venue 1:N EventSession
+EventSession 1:N SeatHold
+EventSession 1:N Booking
+Rules
+Every session belongs to one Event.
+Every session belongs to one Venue.
+start_time < end_time.
+booking_open < booking_close.
+booking_close <= start_time.
+base_price > 0.
+Booking is allowed only during the booking window.
+Session status uses SessionStatus.
+Session cancellation must not delete historical Booking data.
+
+IMPORTANT:
+
+Creating an EventSession does NOT create new Seat records.
+
+The Session reuses the physical Seats belonging to its Venue.
+
+6. Booking & Payment Module
+
+Tables:
 
----
-
-## Columns
-
-| Column | Description |
-|----------|-------------|
-| id | Primary key |
-| name | Category name (Unique) |
-| description | Category description |
-| created_at | Creation timestamp |
-| updated_at | Last updated timestamp |
-
----
-
-## Relationships
-
-Category
-
-```
-1 ---- * Event
-```
-
----
-
-## Business Rules
-
-- Category name must be unique.
-- A category can contain multiple events.
-- A category cannot be physically deleted if it is referenced by any event.
-- Use logical status if soft delete is required in the future.
-
----
-
-# 5.2 venue
-
-## Purpose
-
-Stores event venues.
-
-A venue represents a physical location where events are held.
-
----
-
-## Columns
-
-| Column | Description |
-|----------|-------------|
-| id | Primary key |
-| name | Venue name |
-| address | Venue address |
-| capacity | Total seat capacity |
-| created_at | Creation timestamp |
-| updated_at | Last updated timestamp |
-
----
-
-## Relationships
-
-Venue
-
-```
-1 ---- * Seat
-```
-
-Venue
-
-```
-1 ---- * EventSession
-```
-
----
-
-## Business Rules
-
-- One venue can host multiple event sessions.
-- One venue owns many physical seats.
-- Venue capacity should equal or exceed the number of active seats.
-- Venue information should not be deleted if referenced by event sessions.
-
----
-
-# 5.3 seat
-
-## Purpose
-
-Stores physical seats belonging to a venue.
-
-Seats are permanent and are not recreated for each event session.
-
----
-
-## Columns
-
-| Column | Description |
-|----------|-------------|
-| id | Primary key |
-| section | Seat section |
-| row_name | Row identifier |
-| seat_number | Seat number |
-| seat_type | Seat type |
-| price_multiplier | Price multiplier |
-| active | Seat availability |
-| venue_id | FK → venue |
-
----
-
-## Relationships
-
-Venue
-
-```
-1 ---- * Seat
-```
-
-Seat
-
-```
-1 ---- * BookingItem
-```
-
-Seat
-
-```
-1 ---- * SeatHold
-```
-
----
-
-## Business Rules
-
-- Seats belong permanently to one venue.
-- Seat number must be unique within the same venue.
-
-Unique Constraint
-
-```
-(venue_id, row_name, seat_number)
-```
-
-- price_multiplier must be greater than zero.
-- Inactive seats cannot be booked.
-
----
-
-# 5.4 event
-
-## Purpose
-
-Stores event information.
-
-An event represents the main content that users can browse and book.
-
----
-
-## Columns
-
-| Column | Description |
-|----------|-------------|
-| id | Primary key |
-| title | Event title |
-| description | Event description |
-| poster | Poster image URL |
-| duration | Duration (minutes) |
-| age_limit | Minimum age |
-| status | Event status |
-| category_id | FK → category |
-| created_at | Creation timestamp |
-| updated_at | Last updated timestamp |
-
----
-
-## Relationships
-
-Category
-
-```
-1 ---- * Event
-```
-
-Event
-
-```
-1 ---- * EventSession
-```
-
----
-
-## Business Rules
-
-- Every event belongs to one category.
-- One event can have multiple event sessions.
-- Duration is stored in minutes.
-- Event status is managed by EventStatus enum.
-- Booking history must not be affected when an event is cancelled.
-- Event deletion should use logical status whenever possible.
-
----
-
-# 5.5 event_session
-
-## Purpose
-
-Represents one scheduled showing of an event.
-
-Each event may have multiple sessions at different venues and times.
-
----
-
-## Columns
-
-| Column | Description |
-|----------|-------------|
-| id | Primary key |
-| start_time | Session start time |
-| end_time | Session end time |
-| booking_open | Booking opening time |
-| booking_close | Booking closing time |
-| base_price | Base ticket price |
-| status | Session status |
-| event_id | FK → event |
-| venue_id | FK → venue |
-| created_at | Creation timestamp |
-| updated_at | Last updated timestamp |
-
----
-
-## Relationships
-
-Event
-
-```
-1 ---- * EventSession
-```
-
-Venue
-
-```
-1 ---- * EventSession
-```
-
-EventSession
-
-```
-1 ---- * Booking
-```
-
-EventSession
-
-```
-1 ---- * SeatHold
-```
-
-EventSession
-
-```
-1 ---- * BookingItem
-```
-
----
-
-## Business Rules
-
-- Every session belongs to one event.
-- Every session is held at one venue.
-- Booking is only allowed between booking_open and booking_close.
-- start_time must be earlier than end_time.
-- booking_open must be earlier than booking_close.
-- booking_close must be earlier than start_time.
-- Base ticket price must be greater than zero.
-- Session status is managed by SessionStatus enum.
-
-Unique Constraint
-
-```
-(event_id, venue_id, start_time)
-```
-
-This prevents duplicate sessions for the same event at the same venue and start time.
-
----
-
-# 6. Booking & Payment Module
-
-The Booking module manages seat reservation, booking creation, ticket information, payment processing and payment transaction history.
-
-Tables
-
-```
 seat_hold
 booking
 booking_item
 payment
 payment_transaction
-```
-
----
-
-# 6.1 seat_hold
-
-## Purpose
-
-Temporarily reserves seats before payment is completed.
-
-This table prevents multiple users from selecting the same seat simultaneously.
-
-SeatHold records are temporary and automatically removed after expiration or successful payment.
-
----
-
-## Columns
-
-| Column | Description |
-|----------|-------------|
-| id | Primary key |
-| hold_token | Temporary hold identifier |
-| status | Hold status |
-| created_at | Creation timestamp |
-| expired_at | Expiration timestamp |
-| user_id | FK → user |
-| event_session_id | FK → event_session |
-| seat_id | FK → seat |
-
----
-
-## Relationships
-
-User
-
-```
-1 ---- * SeatHold
-```
-
-EventSession
-
-```
-1 ---- * SeatHold
-```
-
-Seat
-
-```
-1 ---- * SeatHold
-```
-
----
-
-## Business Rules
-
-- A seat can only be held once within the same EventSession.
-- Hold expires automatically after a configurable timeout.
-- Expired holds must not block new bookings.
-- Hold records are deleted after successful payment.
-- Hold status is managed by SeatHoldStatus enum.
-
-Unique Constraint
-
-```
-(event_session_id, seat_id)
-```
-
----
-
-# 6.2 booking
-
-## Purpose
-
-Stores booking information created by users.
-
-A booking represents one purchase order for one event session.
-
----
-
-## Columns
-
-| Column | Description |
-|----------|-------------|
-| id | Primary key |
-| booking_code | Unique booking code |
-| total_amount | Total payment amount |
-| status | Booking status |
-| created_at | Creation timestamp |
-| updated_at | Last updated timestamp |
-| user_id | FK → user |
-| event_session_id | FK → event_session |
-
----
-
-## Relationships
-
-User
-
-```
-1 ---- * Booking
-```
-
-EventSession
-
-```
-1 ---- * Booking
-```
-
-Booking
-
-```
-1 ---- * BookingItem
-```
-
-Booking
-
-```
-1 ---- 1 Payment
-```
-
----
-
-## Business Rules
-
-- One booking belongs to one user.
-- One booking belongs to one event session.
-- One booking contains one or more booking items.
-- Booking code must be unique.
-- Total amount equals the sum of all BookingItems.
-- Booking history must never be physically deleted.
-- Booking status is managed by BookingStatus enum.
-
-Unique Constraint
-
-```
-booking_code
-```
-
----
-
-# 6.3 booking_item
-
-## Purpose
-
-Represents one booked seat.
-
-Each BookingItem corresponds to exactly one seat.
-
-BookingItem also stores ticket information that should remain unchanged even if the original event data changes later.
-
----
-
-## Columns
-
-| Column | Description |
-|----------|-------------|
-| id | Primary key |
-| qr_code | QR ticket code |
-| price | Final ticket price |
-| status | Ticket status |
-| event_snapshot | Snapshot of ticket information |
-| booking_id | FK → booking |
-| seat_id | FK → seat |
-| event_session_id | FK → event_session |
-
----
-
-## Relationships
-
-Booking
-
-```
-1 ---- * BookingItem
-```
-
-Seat
-
-```
-1 ---- * BookingItem
-```
-
-EventSession
-
-```
-1 ---- * BookingItem
-```
-
----
-
-## Business Rules
-
-- Every BookingItem belongs to exactly one Booking.
-- Every BookingItem represents one seat.
-- Ticket price is calculated when booking is created.
-- QR Code must be unique.
-- Event snapshot stores immutable ticket information.
-- Ticket status is managed by BookingItemStatus enum.
-
-Unique Constraints
-
-```
-qr_code
-```
-
-```
-(event_session_id, seat_id)
-```
-
-The second constraint guarantees that one seat can only be sold once within the same EventSession.
-
----
-
-# 6.4 payment
-
-## Purpose
-
-Stores payment information for bookings.
-
-One booking has exactly one payment.
-
-Payment records are permanent and must never be deleted.
-
----
-
-## Columns
-
-| Column | Description |
-|----------|-------------|
-| id | Primary key |
-| amount | Payment amount |
-| payment_method | Payment method |
-| status | Payment status |
-| created_at | Creation timestamp |
-| updated_at | Last updated timestamp |
-| booking_id | FK → booking |
-
----
-
-## Relationships
-
-Booking
-
-```
-1 ---- 1 Payment
-```
-
-Payment
-
-```
-1 ---- * PaymentTransaction
-```
-
----
-
-## Business Rules
-
-- One booking has exactly one payment.
-- Payment amount equals Booking.total_amount.
-- Payment status is managed by PaymentStatus enum.
-- Payment method is managed by PaymentMethod enum.
-- Payment records must never be deleted.
-
-Unique Constraint
-
-```
-booking_id
-```
-
----
-
-# 6.5 payment_transaction
-
-## Purpose
-
-Stores transaction history returned by payment gateways.
-
-Each payment may have multiple transaction attempts.
-
----
-
-## Columns
-
-| Column | Description |
-|----------|-------------|
-| id | Primary key |
-| provider | Payment gateway |
-| transaction_code | Gateway transaction code |
-| request_id | Gateway request identifier |
-| amount | Transaction amount |
-| currency | Currency |
-| response_code | Gateway response code |
-| response_message | Gateway response message |
-| gateway_payload | Raw gateway response |
-| status | Transaction status |
-| transaction_time | Transaction timestamp |
-| payment_id | FK → payment |
-
----
-
-## Relationships
-
-Payment
-
-```
-1 ---- * PaymentTransaction
-```
-
----
-
-## Business Rules
-
-- Every transaction belongs to one Payment.
-- Multiple transaction attempts are allowed.
-- Transaction code must be unique.
-- Gateway payload should be stored for auditing.
-- Transaction status is managed by PaymentTransactionStatus enum.
-
-Unique Constraint
-
-```
-transaction_code
-```
-
----
-
-# 7. Entity Relationships
-
-## Authentication
-
-User
-
-```
-1 ---- * RefreshToken
-```
-
-User
-
-```
-* ---- * Role
-```
-
-through UserRole.
+6.1 seat_hold
+Purpose
+
+Temporarily holds a physical seat for a specific EventSession.
+
+Columns
+Column	Description
+id	Primary key
+hold_token	Temporary hold identifier
+status	SeatHoldStatus
+created_at	Creation time
+expired_at	Expiration time
+user_id	FK → user
+event_session_id	FK → event_session
+seat_id	FK → seat
+Constraints
+UNIQUE(event_session_id, seat_id)
+Rules
+A seat can have at most one active hold for the same EventSession.
+Expired holds must not block new bookings.
+Hold belongs to both a Session and a Seat.
+The selected Seat must belong to the Venue of the EventSession.
+Hold status uses SeatHoldStatus.
+Hold may be deleted after successful payment.
+
+IMPORTANT:
+
+SeatHold determines temporary reservation state.
+
+It does NOT change the permanent Seat record.
+
+6.2 booking
+Purpose
+
+Stores a user's booking for one EventSession.
+
+Columns
+Column	Description
+id	Primary key
+booking_code	Unique booking identifier
+total_amount	Total booking amount
+status	BookingStatus
+created_at	Creation time
+updated_at	Last update
+user_id	FK → user
+event_session_id	FK → event_session
+Constraints
+UNIQUE(booking_code)
+Relationships
+User 1:N Booking
+EventSession 1:N Booking
+Booking 1:N BookingItem
+Booking 1:1 Payment
+Rules
+Booking belongs to exactly one User.
+Booking belongs to exactly one EventSession.
+Booking must contain at least one BookingItem.
+total_amount equals the sum of BookingItem prices.
+Booking history must never be physically deleted.
+Booking status uses BookingStatus.
+6.3 booking_item
+Purpose
+
+Represents one purchased seat.
+
+Columns
+Column	Description
+id	Primary key
+qr_code	QR ticket code
+price	Final ticket price
+status	BookingItemStatus
+event_snapshot	Immutable event/ticket snapshot
+booking_id	FK → booking
+seat_id	FK → seat
+event_session_id	FK → event_session
+Constraints
+UNIQUE(qr_code)
+
+UNIQUE(event_session_id, seat_id)
+Important Consistency Rule
+booking_item.event_session_id
+=
+booking.event_session_id
+
+The Service layer MUST guarantee this invariant.
+
+Relationships
+Booking 1:N BookingItem
+Seat 1:N BookingItem
+EventSession 1:N BookingItem
+Rules
+One BookingItem represents exactly one Seat.
+One Seat can only be sold once in one EventSession.
+Ticket price is fixed when the BookingItem is created.
+QR code must be unique.
+Event snapshot is immutable.
+BookingItem status uses BookingItemStatus.
+6.4 payment
+Purpose
+
+Stores payment information for a Booking.
+
+Columns
+Column	Description
+id	Primary key
+amount	Payment amount
+payment_method	PaymentMethod
+status	PaymentStatus
+created_at	Creation time
+updated_at	Last update
+booking_id	FK → booking
+Constraints
+UNIQUE(booking_id)
+Rules
+One Booking has exactly one Payment.
+Payment amount must equal Booking.total_amount.
+Payment status uses PaymentStatus.
+Payment method uses PaymentMethod.
+Payment history must never be physically deleted.
+6.5 payment_transaction
+Purpose
+
+Stores every payment gateway transaction attempt.
+
+Columns
+Column	Description
+id	Primary key
+provider	Payment provider
+transaction_code	Gateway transaction code
+request_id	Gateway request ID
+amount	Transaction amount
+currency	Currency
+response_code	Gateway response code
+response_message	Gateway response message
+gateway_payload	Raw gateway response
+status	PaymentTransactionStatus
+transaction_time	Gateway transaction time
+payment_id	FK → payment
+Constraints
+UNIQUE(transaction_code)
+Relationships
+Payment 1:N PaymentTransaction
+Rules
+One Payment may have multiple transaction attempts.
+Transaction history must never be deleted.
+Gateway response should be retained for auditing.
+Transaction status uses PaymentTransactionStatus.
+7. Entity Relationships
+Authentication
+Users 1:N RefreshToken
+
+Users N:M Role
+through UserRole
+
+Users 1:N Booking
+
+Users 1:N SeatHold
+
+Temporary authentication tables:
 
 EmailVerification
-
-Temporary table.
-
-No relationship.
-
 PasswordReset
 
-Temporary table.
-
-No relationship.
-
----
-
-## Event
-
-Category
-
-```
-1 ---- * Event
-```
+do not require foreign keys to Users.
 
 Event
+Category 1:N Event
 
-```
-1 ---- * EventSession
-```
+Event 1:N EventSession
+
+Venue 1:N EventSession
+
+Venue 1:N Seat
+Booking
+EventSession 1:N SeatHold
+
+Seat 1:N SeatHold
+
+Users 1:N SeatHold
+
+Users 1:N Booking
+
+EventSession 1:N Booking
+
+Booking 1:N BookingItem
+
+Seat 1:N BookingItem
+
+EventSession 1:N BookingItem
+
+Booking 1:1 Payment
+
+Payment 1:N PaymentTransaction
+8. Seat Availability Model
+
+This section is critical for AI implementation.
+
+A Seat is a permanent physical resource of a Venue.
+
+Seat availability is NOT stored directly on Seat.
+
+For a specific EventSession:
+
+AVAILABLE
+
+means:
+
+No active SeatHold
+AND
+No successful BookingItem
+RESERVED
+
+means:
+
+An active SeatHold exists
+BOOKED
+
+means:
+
+A valid BookingItem exists
+
+Conceptually:
 
 Venue
+  │
+  └── Seat A1
+        │
+        ├── Session 1 → AVAILABLE
+        ├── Session 2 → RESERVED
+        └── Session 3 → BOOKED
 
-```
-1 ---- * EventSession
-```
+Therefore:
 
-Venue
+Never create separate Seat records for every EventSession.
+Never store session-specific seat status in the Seat table.
+Always query Seat together with EventSession when determining availability.
+When creating a Session, reuse the Seats belonging to its Venue.
+9. Business Constraints
+Authentication
+users.email UNIQUE
 
-```
-1 ---- * Seat
-```
+role.name UNIQUE
 
----
+refresh_token.token UNIQUE
 
-## Booking
+email_verification.email UNIQUE
 
-User
+password_reset
+one active request per email
+Event
+category.name UNIQUE
 
-```
-1 ---- * Booking
-```
+seat(venue_id, row_name, seat_number) UNIQUE
 
-EventSession
+event_session(event_id, venue_id, start_time) UNIQUE
 
-```
-1 ---- * Booking
-```
+Rules:
 
+Event must belong to Category.
+EventSession must belong to Event.
+EventSession must belong to Venue.
+Seat must belong to Venue.
+EventSession can only use Seats belonging to its Venue.
 Booking
+booking.booking_code UNIQUE
 
-```
-1 ---- * BookingItem
-```
+booking_item.qr_code UNIQUE
 
-Booking
+booking_item(event_session_id, seat_id) UNIQUE
 
-```
-1 ---- 1 Payment
-```
+Rules:
 
+One seat can only be sold once per EventSession.
+One seat can only have one active hold per EventSession.
+Booking must contain at least one BookingItem.
+Booking total must equal BookingItem total.
 Payment
+payment.booking_id UNIQUE
 
-```
-1 ---- * PaymentTransaction
-```
+payment_transaction.transaction_code UNIQUE
+10. Cascade Strategy
 
-EventSession
+Use cascade carefully.
 
-```
-1 ---- * SeatHold
-```
+Parent	Child	Recommended
+User	Booking	NONE
+User	RefreshToken	REMOVE
+Booking	BookingItem	ALL
+Booking	Payment	ALL
+Payment	PaymentTransaction	ALL
+Venue	Seat	NONE
+Venue	EventSession	NONE
+Event	EventSession	NONE
+Category	Event	NONE
 
-Seat
+Important:
 
-```
-1 ---- * SeatHold
-```
-
-Seat
-
-```
-1 ---- * BookingItem
-```
-
-EventSession
-
-```
-1 ---- * BookingItem
-```
-
----
-
-# 8. Business Constraints
-
-## Authentication
-
-- Email must be unique.
-- Passwords must be stored using BCrypt.
-- User is created only after successful OTP verification.
-- OTP expires after 5 minutes.
-- Maximum 5 OTP verification attempts.
-- Refresh Token expires after 7 days.
-- One email can only have one active EmailVerification record.
-- One email can only have one active PasswordReset request.
-
----
-
-## Event
-
-- Every Event belongs to one Category.
-- Every EventSession belongs to one Event.
-- Every EventSession belongs to one Venue.
-- Seats are permanently attached to a Venue.
-- Event duration is stored in minutes.
-- Booking is only allowed during the booking window.
-- Event and EventSession should use logical status instead of physical deletion.
-
----
-
-## Booking
-
-- One Booking belongs to one User.
-- One Booking belongs to one EventSession.
-- One Booking contains at least one BookingItem.
-- Booking total_amount must equal the sum of BookingItems.
-- One seat can only be held once for the same EventSession.
-- One seat can only be booked once for the same EventSession.
-- Booking history must never be deleted.
-
----
-
-## Payment
-
-- One Booking has exactly one Payment.
-- One Payment may contain multiple PaymentTransactions.
-- Payment amount must equal Booking.total_amount.
-- Payment history must never be deleted.
-- Gateway response must be stored for auditing.
-
----
-
-# 9. Cascade Strategy
-
-Recommended JPA Cascade configuration.
-
-| Parent | Child | Cascade |
-|----------|----------|----------|
-| User | Booking | None |
-| User | RefreshToken | REMOVE |
-| Category | Event | None |
-| Venue | Seat | None |
-| Venue | EventSession | None |
-| Event | EventSession | None |
-| Booking | BookingItem | ALL |
-| Booking | Payment | ALL |
-| Payment | PaymentTransaction | ALL |
-
-Notes
-
-- Never cascade delete Booking history.
-- Never cascade delete Event history.
-- Never cascade delete Venue.
-- Temporary tables may be deleted safely.
-
----
-
-# 10. Index Strategy
-
-## Unique Index
-
-```
-user.email
+Never cascade delete Booking history.
+Never cascade delete Payment history.
+Never cascade delete Event history.
+Never cascade delete Venue.
+Do not use CascadeType.ALL by default.
+Temporary authentication records may be physically deleted.
+11. Index Strategy
+Unique Indexes / Constraints
+users.email
 
 role.name
 
+refresh_token.token
+
+category.name
+
 booking.booking_code
 
-refresh_token.token
+booking_item.qr_code
 
 payment.booking_id
 
 payment_transaction.transaction_code
 
+seat(venue_id, row_name, seat_number)
+
+event_session(event_id, venue_id, start_time)
+
 seat_hold(event_session_id, seat_id)
 
 booking_item(event_session_id, seat_id)
-
-seat(venue_id, row_name, seat_number)
-
-category.name
-```
-
----
-
-## Normal Index
-
-```
+Normal Indexes
 booking.user_id
 
 booking.event_session_id
@@ -1338,244 +791,286 @@ event_session.event_id
 
 event_session.venue_id
 
+event_session.status
+
 seat.venue_id
 
 seat_hold.user_id
 
+seat_hold.event_session_id
+
 seat_hold.expired_at
 
-payment.payment_method
+booking_item.booking_id
+
+booking_item.seat_id
 
 payment.status
 
 payment_transaction.payment_id
-```
-
----
-
-# 11. Enum Definitions
-
-## UserStatus
-
-```
+12. Enum Definitions
+UserStatus
 ACTIVE
-
 LOCKED
-
 INACTIVE
-```
-
----
-
-## EventStatus
-
-```
+EventStatus
 DRAFT
-
 PUBLISHED
-
 CANCELLED
-
 FINISHED
-```
-
----
-
-## SessionStatus
-
-```
+SessionStatus
 UPCOMING
-
 BOOKING_OPEN
-
 BOOKING_CLOSED
-
 FINISHED
-
 CANCELLED
-```
-
----
-
-## SeatHoldStatus
-
-```
+SeatHoldStatus
 ACTIVE
-
 EXPIRED
-
 CANCELLED
-```
-
----
-
-## BookingStatus
-
-```
+BookingStatus
 PENDING
-
 WAITING_PAYMENT
-
 PAID
-
 COMPLETED
-
 CANCELLED
-
 EXPIRED
-```
-
----
-
-## BookingItemStatus
-
-```
+BookingItemStatus
 VALID
-
 USED
-
 REFUNDED
-
 CANCELLED
-```
-
----
-
-## PaymentStatus
-
-```
+PaymentStatus
 PENDING
-
 SUCCESS
-
 FAILED
-
 REFUNDED
-```
-
----
-
-## PaymentTransactionStatus
-
-```
+PaymentTransactionStatus
 PENDING
-
 SUCCESS
-
 FAILED
-```
-
----
-
-## PaymentMethod
-
-```
+PaymentMethod
 VNPAY
-
 PAYOS
-
 MOMO
-```
-
----
-
-## RoleName
-
-```
+RoleName
 ADMIN
-
 CUSTOMER
-```
+13. AI Coding Notes
 
----
+The AI MUST read this document before generating database-related code.
 
-# 12. AI Coding Notes
+Entity
+One JPA Entity per database table.
+user_role uses a composite key.
+Normal entities use BIGSERIAL.
+Use @Enumerated(EnumType.STRING) for enums.
+Use BigDecimal for monetary values.
+Use LocalDateTime for timestamps.
+Use LAZY relationships by default.
+Do not expose entities directly through REST APIs.
+Seat
 
-The AI must follow these rules when generating code.
+IMPORTANT:
 
-## General Rules
+Seat belongs to Venue.
+Seat does NOT belong to EventSession.
 
-- Follow the package structure defined in PROJECT_CONTEXT.md.
-- Do not create additional tables unless explicitly required.
-- Do not rename database tables or columns.
-- Respect all foreign key relationships.
-- Respect all unique constraints.
-- Respect all business constraints.
+Do NOT create:
 
----
+event_session.seat_id
 
-## Entity Rules
+Do NOT create a new Seat whenever an EventSession is created.
 
-- Generate one JPA Entity per table.
-- All entities extend BaseEntity unless otherwise specified.
-- Use `@Enumerated(EnumType.STRING)` for all enum fields.
-- Use `FetchType.LAZY` for `@ManyToOne` and `@OneToMany`.
-- Avoid `CascadeType.ALL` unless specified in this document.
-- Use `BigDecimal` for monetary values.
-- Use `LocalDateTime` for timestamps.
+Session-specific availability must be calculated using:
 
----
+SeatHold
+BookingItem
+EventSession
 
-## Repository Rules
+When creating an EventSession:
 
-- Extend `JpaRepository`.
-- Add query methods only when required by business logic.
-- Prefer derived query methods over custom JPQL.
-- Use `@Query` only for complex queries.
+Validate Event.
+Validate Venue.
+Validate schedule.
+Save EventSession.
+Seats are NOT copied or recreated.
 
----
+The Session automatically uses the physical Seats of its Venue.
 
-## Service Rules
+Booking
 
-- Apply business validation in the Service layer.
-- Throw `BusinessException` for business rule violations.
-- Annotate write operations with `@Transactional`.
-- Never expose database entities directly through controllers.
+When creating BookingItem:
 
----
+Validate EventSession.
+Validate Seat.
+Ensure Seat belongs to EventSession.venue.
+Ensure Seat is not actively held.
+Ensure Seat is not already booked.
+Create BookingItem.
+Preserve event_session_id.
+Preserve ticket price.
+BookingItem Consistency
 
-## Security Rules
+The following must always be true:
 
-- Passwords must always be BCrypt encoded.
-- Never expose Refresh Tokens in logs.
-- Never expose internal exception messages.
-- Validate ownership before allowing Booking or Payment operations.
+booking_item.booking.event_session_id
+==
+booking_item.event_session_id
 
----
+The Service layer is responsible for maintaining this invariant.
 
-## Performance Rules
+SeatHold
 
-- Avoid N+1 query problems.
-- Use pagination for list APIs.
-- Index frequently queried columns.
-- Never use EAGER loading unless explicitly required.
+Before creating a SeatHold:
 
----
+Seat must belong to EventSession.venue
 
-## Flyway Rules
+Then ensure:
 
-- Every schema change must create a new migration.
-- Never modify an executed migration.
-- Follow naming convention:
+No active hold exists
+AND
+No valid booking exists
 
-```
-V1__create_user_table.sql
+Expired holds must not prevent a new hold.
 
-V2__create_event_table.sql
+Repository
+Extend JpaRepository.
+Prefer derived query methods.
+Add custom queries only when necessary.
+Use existsBy... for existence checks.
+Avoid loading entire collections when only existence is required.
+Service
+Business rules belong in Service.
+Controllers must remain thin.
+Use @Transactional for write operations.
+Use BusinessException for business rule violations.
+Do not throw RuntimeException directly.
+Flyway
 
-V3__create_booking_table.sql
-```
+Never modify executed migrations.
 
----
+Always create a new migration:
 
-## AI Goal
+Vxx__description.sql
 
-Generate production-ready Spring Boot code that is:
+Example:
 
-- Clean
-- Readable
-- Maintainable
-- Consistent with PROJECT_CONTEXT.md
-- Consistent with DATABASE.md
-- Consistent with all User Story documents
-- Ready for future feature expansion
+V15__create_seat_hold.sql
+
+The actual version must follow the project's current migration version.
+
+Security
+Passwords must use BCrypt.
+Refresh tokens must not be logged.
+Booking operations must validate ownership.
+Admin operations require ADMIN role.
+Performance
+Avoid N+1 queries.
+Use pagination for large list APIs.
+Use indexes defined in this document.
+Prefer existence queries when checking constraints.
+Do not use EAGER loading without a specific reason.
+14. Critical Design Decisions
+Decision 1 — Seat belongs to Venue, not EventSession
+Why
+
+A physical venue owns a fixed set of seats.
+
+Multiple EventSessions can reuse those same physical seats.
+
+Alternative
+
+Create separate Seat records for every EventSession.
+
+Trade-off
+
+The current design is more normalized and avoids duplicating physical seat definitions.
+
+Session-specific state is handled separately by SeatHold and BookingItem.
+
+Decision 2 — Do not store AVAILABLE / RESERVED / BOOKED in Seat
+Why
+
+Seat availability changes depending on the EventSession.
+
+Alternative
+
+Store status directly in Seat.
+
+Trade-off
+
+A direct status would be incorrect because the same Seat may be BOOKED in one Session and AVAILABLE in another.
+
+Decision 3 — Keep event_session_id in BookingItem
+Why
+
+It allows:
+
+UNIQUE(event_session_id, seat_id)
+
+which protects against selling the same seat twice for one Session.
+
+Alternative
+
+Derive EventSession only through Booking.
+
+Trade-off
+
+The field is technically duplicated because Booking already references EventSession.
+
+Therefore the Service layer must guarantee:
+
+booking_item.event_session_id
+=
+booking.event_session_id
+Decision 4 — Keep SeatHold as a separate table
+Why
+
+Temporary reservation state has a different lifecycle from the permanent Seat entity.
+
+Alternative
+
+Add reservation fields directly to Seat.
+
+Trade-off
+
+That would make one physical Seat unable to represent different reservation states across different EventSessions.
+
+15. Final Database Model
+
+The final model is:
+
+USERS
+ ├── USER_ROLE ─── ROLE
+ ├── REFRESH_TOKEN
+ ├── BOOKING
+ └── SEAT_HOLD
+
+EMAIL_VERIFICATION
+PASSWORD_RESET
+
+
+CATEGORY
+    │
+    └── EVENT
+          │
+          └── EVENT_SESSION
+                │
+                ├── VENUE
+                │     │
+                │     └── SEAT
+                │
+                ├── SEAT_HOLD
+                │
+                └── BOOKING
+                       │
+                       ├── BOOKING_ITEM ─── SEAT
+                       │
+                       └── PAYMENT
+                              │
+                              └── PAYMENT_TRANSACTION
+
+This is the database model that all future User Stories must follow.
+
+AI must NOT introduce another Seat configuration table unless the project requirements explicitly change.
