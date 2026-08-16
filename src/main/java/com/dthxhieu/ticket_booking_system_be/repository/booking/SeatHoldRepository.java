@@ -74,4 +74,21 @@ public interface SeatHoldRepository extends JpaRepository<SeatHold, Long> {
     // US-12 Release Hold — used for ownership verification.
     // Returns the SeatHold only if it belongs to the specified user.
     Optional<SeatHold> findByIdAndUserId(Long id, Long userId);
+
+    // US-14: Cleanup SeatHolds after Payment SUCCESS.
+    // MUST be scoped to: userId + eventSessionId + specific seatIds from BookingItems.
+    // This prevents accidentally deleting SeatHolds of other users or unrelated seats.
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
+    @Query("""
+            DELETE FROM SeatHold s
+            WHERE s.user.id = :userId
+              AND s.eventSession.id = :eventSessionId
+              AND s.seat.id IN :seatIds
+            """)
+    void deleteByUserIdAndEventSessionIdAndSeatIdIn(
+            @Param("userId") Long userId,
+            @Param("eventSessionId") Long eventSessionId,
+            @Param("seatIds") List<Long> seatIds
+    );
 }
