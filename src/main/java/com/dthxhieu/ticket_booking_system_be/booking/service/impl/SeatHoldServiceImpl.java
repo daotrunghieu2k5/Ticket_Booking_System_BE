@@ -185,10 +185,15 @@ public class SeatHoldServiceImpl implements SeatHoldService {
             List<SeatHold> saved = seatHoldRepository.saveAll(holds);
             seatHoldRepository.flush();
 
-            Long holdId = saved.get(0).getId();
+            List<Long> seatHoldIds = saved.stream()
+                    .map(SeatHold::getId)
+                    .toList();
+
+            Long holdId = seatHoldIds.get(0);
 
             return SeatHoldResponse.builder()
                     .holdId(holdId)
+                    .seatHoldIds(seatHoldIds)
                     .eventSessionId(sessionId)
                     .seatIds(seatIds)
                     .expiresAt(expiresAt)
@@ -250,8 +255,13 @@ public class SeatHoldServiceImpl implements SeatHoldService {
                 .map(h -> h.getSeat().getId())
                 .toList();
 
+        List<Long> seatHoldIds = activeHolds.stream()
+                .map(SeatHold::getId)
+                .toList();
+
         return SeatHoldResponse.builder()
-                .holdId(activeHolds.get(0).getId())
+                .holdId(seatHoldIds.get(0))
+                .seatHoldIds(seatHoldIds)
                 .eventSessionId(sessionId)
                 .seatIds(heldSeatIds)
                 .expiresAt(activeHolds.get(0).getExpiredAt())

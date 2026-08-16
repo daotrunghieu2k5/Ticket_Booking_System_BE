@@ -12,6 +12,8 @@ import java.util.List;
 // Response for a successful seat hold operation (US-12 §6.2) and get-my-hold (§6.4).
 // holdId represents the first SeatHold record's PK — one row per seat is created
 // but the response groups them under a single hold reference for the client.
+// seatHoldIds contains ALL SeatHold PKs created in the same request so that the
+// frontend can pass the full list to CreateBookingRequest.seatHoldIds.
 @Getter
 @Setter
 @Builder
@@ -19,7 +21,11 @@ import java.util.List;
 @AllArgsConstructor
 public class SeatHoldResponse {
 
+    // First SeatHold record's PK — kept for backward compatibility.
     private Long holdId;
+
+    // All SeatHold PKs created in this hold operation (one per seat).
+    private List<Long> seatHoldIds;
 
     private Long eventSessionId;
 
